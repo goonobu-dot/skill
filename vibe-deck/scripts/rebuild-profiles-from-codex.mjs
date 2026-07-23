@@ -68,22 +68,40 @@ function remapHotkeys(pageManifest, mapByText) {
   return out;
 }
 
+/** Top-row Agent Slot keys (0_0..4_0) for live color tiles. */
+function wireAgentSlots(pageManifest, tool) {
+  const out = deepClone(pageManifest);
+  for (const controller of out.Controllers || []) {
+    if (controller.Type !== "Keypad") continue;
+    const actions = controller.Actions || {};
+    for (let i = 0; i < 5; i++) {
+      const key = `${i}_0`;
+      const slot = i + 1;
+      actions[key] = {
+        Action: "com.vibe.deck.status.agent",
+        ActionID: randomUUID(),
+        ActionParam: { slot, tool },
+        LinkedTitle: true,
+        Name: `Agent ${slot}`,
+        Plugin: {
+          Name: "Vibe Deck Status",
+          UUID: "com.vibe.deck.status",
+          Version: "1.0.0",
+        },
+        State: 0,
+        ViewParam: [{ Icon: "", IconRel: "", Text: `A${slot}` }],
+      };
+    }
+    controller.Actions = actions;
+  }
+  return out;
+}
+
+// Official Codex_D200X is kept as-is. We only build Claude / Cursor variants.
 const VARIANTS = [
   {
-    name: "Vibe · Codex",
-    // keep Codex shortcuts; only rename a few labels for clarity
-    map: {
-      ペットを起こす: { text: "Wake" },
-      新しい会話: { text: "New Chat" },
-      リクエストを承認: { text: "Accept" },
-      リクエストを拒否: { text: "Reject" },
-      ディクテーション開始: { text: "Dictation" },
-      ターミナル切替: { text: "Terminal" },
-      モデル選択: { text: "Model" },
-    },
-  },
-  {
     name: "Vibe · Claude",
+    tool: "claude",
     map: {
       ペットを起こす: { text: "Side Chat", hotkey: "⌘  ;" },
       新しい会話: { text: "New Session", hotkey: "⌘  N" },
@@ -110,6 +128,7 @@ const VARIANTS = [
   },
   {
     name: "Vibe · Cursor",
+    tool: "cursor",
     map: {
       ペットを起こす: { text: "Composer", hotkey: "⌘  I" },
       新しい会話: { text: "Chat", hotkey: "⌘  L" },
@@ -175,24 +194,28 @@ for (const variant of VARIANTS) {
     const pagePath = join(dest, "Profiles", pageId, "manifest.json");
     if (!existsSync(pagePath)) continue;
     const page = JSON.parse(readFileSync(pagePath, "utf8"));
-    const remapped = remapHotkeys(page, variant.map);
+    let remapped = remapHotkeys(page, variant.map);
+    if (variant.tool && root.Pages.Pages[0] === pageId) {
+      remapped = wireAgentSlots(remapped, variant.tool);
+    }
     writeFileSync(pagePath, JSON.stringify(remapped, null, 2));
   }
 
   console.log("created", variant.name, "->", dest);
 }
 
-// Point Studio at Vibe · Codex
+// Point Studio at Vibe · Cursor
 const settingPath = join(
   homedir(),
   "Library/Application Support/Ulanzi/UlanziDeck/config/setting.json",
 );
 if (existsSync(settingPath)) {
   const setting = JSON.parse(readFileSync(settingPath, "utf8"));
-  setting.CurrentProfile = "Vibe · Codex";
+  setting.CurrentProfile = "Vibe · Cursor";
   writeFileSync(settingPath, JSON.stringify(setting, null, "\t"));
-  console.log("CurrentProfile -> Vibe · Codex");
+  console.log("CurrentProfile -> Vibe · Cursor");
 }
 
 console.log("\nDone. Quit Ulanzi Studio completely and reopen it.");
-console.log("Then open the profile menu (top) and choose: Vibe · Codex / Claude / Cursor");
+console.log("Then open the profile menu (top) and choose: Vibe · Claude / Vibe · Cursor");
+console.log("Official Codex_D200X is left untouched.");

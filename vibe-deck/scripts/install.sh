@@ -8,8 +8,9 @@ PRESET_DST="$HOME/Library/Application Support/Ulanzi/UlanziDeck/ProfilesV2"
 LAUNCH_AGENT="$HOME/Library/LaunchAgents/com.vibe.deck.bridge.plist"
 PORT="${VIBE_DECK_PORT:-17823}"
 
-echo "==> Generate icons"
-node "$ROOT/scripts/generate-icons.mjs"
+echo "==> Generate icons (Pillow + system JP font)"
+python3 -c "import PIL" 2>/dev/null || python3 -m pip install --user Pillow
+python3 "$ROOT/scripts/generate-icons.py"
 
 echo "==> Build presets"
 node "$ROOT/scripts/build-presets.mjs"
