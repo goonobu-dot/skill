@@ -20,6 +20,15 @@ const STATE_INDEX = {
   empty: 5,
 };
 
+const STATE_LABEL = {
+  idle: "白",
+  thinking: "青",
+  done: "緑",
+  needs_input: "橙",
+  error: "赤",
+  empty: "灰",
+};
+
 function log(...args) {
   const line = `[${new Date().toISOString()}] ${args
     .map((a) => (typeof a === "string" ? a : JSON.stringify(a)))
@@ -29,7 +38,6 @@ function log(...args) {
   } catch {
     // ignore
   }
-  console.log(...args);
 }
 
 class UlanziClient {
@@ -59,9 +67,9 @@ class UlanziClient {
     log("connecting", url);
     this.ws = new WebSocket(url);
     this.ws.on("open", () => {
-      // Required handshake (same as Discord plugin)
-      const hello = { uuid: this.uuid, cmd: "connected", code: 0 };
-      this.ws.send(JSON.stringify(hello));
+      this.ws.send(
+        JSON.stringify({ uuid: this.uuid, cmd: "connected", code: 0 }),
+      );
       log("sent connected handshake");
       this.emit("open");
     });
@@ -73,7 +81,7 @@ class UlanziClient {
         return;
       }
       const cmd = msg.cmd || msg.event || msg.type;
-      log("message", msg);
+      if (cmd && cmd !== "state") log("message", msg);
       if (cmd) this.emit(cmd, msg);
       if (msg.uuid && cmd) this.emit(`${msg.uuid}.${cmd}`, msg);
     });
@@ -83,13 +91,11 @@ class UlanziClient {
 
   send(uuid, cmd, extra = {}) {
     if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return;
-    const payload = { uuid, cmd, ...extra };
-    this.ws.send(JSON.stringify(payload));
-    log("send", payload);
+    this.ws.send(JSON.stringify({ uuid, cmd, ...extra }));
   }
 
-  setState(param) {
-    this.send(this.uuid, "state", { param });
+  setState(statelist) {
+    this.send(this.uuid, "state", { param: { statelist } });
   }
 }
 
@@ -118,107 +124,110 @@ function activateApp(name) {
   }).unref();
 }
 
+function sleep(ms) {
+  return new Promise((r) => setTimeout(r, ms));
+}
+
 const client = new UlanziClient(PLUGIN_UUID);
 /** @type {Map<string, any>} */
 const keys = new Map();
+/** @type {Map<string, number>} */
+const lastState = new Map();
 
 function remember(msg) {
+  if (msg.cmd && msg.cmd !== "add") return;
   const param = msg.param || {};
   const slot = Number(param.slot || param.Slot || 1);
   const tool = String(param.tool || param.Tool || "cursor").toLowerCase();
   const actionid = msg.actionid || msg.ActionID || param.actionid;
   const key = msg.key || param.key;
   const uuid = msg.uuid || PLUGIN_UUID;
-  if (!actionid && key == null) {
-    log("remember skip (no actionid/key)", msg);
-    return;
-  }
-  const id = String(actionid || `${uuid}:${key}`);
-  keys.set(id, {
+  if (!actionid) return;
+  // Only track agent slots for color painting
+  if (uuid !== "com.vibe.deck.status.agent") return;
+  keys.set(String(actionid), {
     slot: Math.min(8, Math.max(1, slot || 1)),
     tool: ["claude", "codex", "cursor"].includes(tool) ? tool : "cursor",
     key,
     actionid,
     uuid,
-    // keep original fields for setState spread compatibility
-    raw: msg,
+    device: msg.device,
+    controller: msg.controller,
   });
-  log("remember", id, keys.get(id));
+  log("remember", actionid, key, slot, tool);
+}
+
+function item(meta, state) {
+  return {
+    actionid: meta.actionid,
+    key: meta.key,
+    uuid: meta.uuid,
+    controller: meta.controller || "Keypad",
+    device: meta.device || "D200X",
+    type: 0,
+    state,
+  };
 }
 
 async function paint() {
-  if (!keys.size) {
-    // Still try to paint nothing; log once in a while
-    return;
-  }
+  if (!keys.size) return;
   const tools = new Set([...keys.values()].map((k) => k.tool));
   for (const tool of tools) {
     let status;
     try {
-      status = await fetchJson(`${BRIDGE}/status?tool=${encodeURIComponent(tool)}`);
+      status = await fetchJson(
+        `${BRIDGE}/status?tool=${encodeURIComponent(tool)}`,
+      );
     } catch (err) {
       log("bridge fetch failed", String(err));
       continue;
     }
     const agents = status.agents || [];
-    const list = [];
+    const targets = [];
     for (const meta of keys.values()) {
       if (meta.tool !== tool) continue;
       const agent = agents.find((a) => a.slot === meta.slot) || {
         state: "empty",
       };
       const state = STATE_INDEX[agent.state] ?? STATE_INDEX.empty;
-      const base = {
-        uuid: meta.uuid,
-        key: meta.key,
-        actionid: meta.actionid,
-        type: 0,
-        state,
-      };
-      // include any identifying fields from add event
-      const raw = meta.raw || {};
-      list.push({
-        ...raw,
-        param: undefined,
-        cmd: undefined,
-        ...base,
-      });
+      targets.push({ meta, state, label: STATE_LABEL[agent.state] || "?" });
     }
-    if (list.length) {
-      client.setState({ statelist: list });
-      log(
-        "painted",
-        tool,
-        list.map((x) => `${x.key}:${x.state}`).join(","),
-      );
-    }
+    if (!targets.length) continue;
+
+    const fingerprint = targets.map((t) => `${t.meta.key}:${t.state}`).join(",");
+    const prev = lastState.get(tool);
+    if (prev === fingerprint) continue;
+    lastState.set(tool, fingerprint);
+
+    // Force LCD refresh: flash empty, then apply target states.
+    client.setState(targets.map((t) => item(t.meta, STATE_INDEX.empty)));
+    await sleep(80);
+    client.setState(targets.map((t) => item(t.meta, t.state)));
+    log("painted", tool, fingerprint, targets.map((t) => t.label).join(""));
   }
 }
 
 client.on("add", remember);
-client.on(`${PLUGIN_UUID}.add`, remember);
 client.on("run", async (msg) => {
-  const action = msg.action || msg.Action || "";
+  const action = msg.action || msg.Action || msg.uuid || "";
   const param = msg.param || {};
-  log("run", action, param);
-  if (String(action).endsWith(".refresh")) {
+  if (String(action).includes("refresh")) {
+    lastState.clear();
     await paint();
     return;
   }
-  if (String(action).endsWith(".focus") || String(action).endsWith(".agent")) {
+  if (String(action).includes("agent") || String(action).includes("focus")) {
     const tool = String(param.tool || "cursor");
     const app =
       tool === "claude" ? "Claude" : tool === "codex" ? "ChatGPT" : "Cursor";
     activateApp(app);
   }
 });
-client.on(`${PLUGIN_UUID}.run`, (msg) => client.emit("run", msg));
 
 const host = process.argv[2] || "127.0.0.1";
 const port = process.argv[3] || "2394";
-log("boot", { host, port, argv: process.argv.slice(2), bridge: BRIDGE });
+log("boot", { host, port, argv: process.argv.slice(2) });
 client.connect(host, port);
-
 setInterval(() => {
   paint().catch((e) => log("paint error", String(e)));
-}, 1000);
+}, 500);

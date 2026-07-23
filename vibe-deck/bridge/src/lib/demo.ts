@@ -17,22 +17,21 @@ const APP: Record<ToolId, string> = {
 };
 
 export function demoAgents(tool: ToolId, now = Date.now()): AdapterResult {
-  const tick = Math.floor(now / 2000);
-  const agents: RawAgent[] = Array.from({ length: 6 }, (_, i) => {
-    const state = CYCLE[(tick + i) % CYCLE.length]!;
-    return {
-      id: `${tool}-demo-${i + 1}`,
-      title: `${tool.toUpperCase()} Agent ${i + 1}`,
-      state,
-      updatedAt: now,
-      focusAction: { kind: "activate_app", payload: APP[tool] },
-    };
-  });
+  // All keys share one color so changes are obvious on the deck.
+  const tick = Math.floor(now / 2500);
+  const state = CYCLE[tick % CYCLE.length]!;
+  const agents: RawAgent[] = Array.from({ length: 5 }, (_, i) => ({
+    id: `${tool}-demo-${i + 1}`,
+    title: state.toUpperCase(),
+    state,
+    updatedAt: now,
+    focusAction: { kind: "activate_app", payload: APP[tool] },
+  }));
 
   return {
     tool,
     agents,
     health: "ok",
-    note: "DEMO MODE — colors cycle every 2s",
+    note: `DEMO MODE — all keys ${state} (changes every 2.5s)`,
   };
 }
