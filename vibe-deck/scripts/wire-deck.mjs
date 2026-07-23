@@ -19,6 +19,7 @@ import { join, dirname } from "node:path";
 import { homedir } from "node:os";
 import { randomUUID } from "node:crypto";
 import { fileURLToPath } from "node:url";
+import { spawnSync } from "node:child_process";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, "..");
@@ -207,20 +208,33 @@ function wireNavOnPage(page) {
   if (!keypad) return;
   keypad.Actions = keypad.Actions || {};
 
+  const prevApp = join(ROOT, "scripts/VibeProfilePrev.app");
+  const nextApp = join(ROOT, "scripts/VibeProfileNext.app");
   const prevIcon = join(PLUGIN_DST, "Images/nav-prev.png");
   const nextIcon = join(PLUGIN_DST, "Images/nav-next.png");
-  keypad.Actions["0_3"] = vibeAction(
-    "com.vibe.deck.status.profile.prev",
-    "Prev Profile",
-    existsSync(prevIcon) ? prevIcon : "",
-    "",
-  );
-  keypad.Actions["1_3"] = vibeAction(
-    "com.vibe.deck.status.profile.next",
-    "Next Profile",
-    existsSync(nextIcon) ? nextIcon : "",
-    "",
-  );
+
+  // Use native system.open → .app so presses work even if custom plugin
+  // run/keyDown events are not delivered by Studio.
+  keypad.Actions["0_3"] = {
+    Action: "com.ulanzi.ulanzideck.system.open",
+    ActionID: randomUUID(),
+    ActionParam: { Path: prevApp },
+    LinkedTitle: false,
+    Name: "Prev Profile",
+    Plugin: { Name: "システム", UUID: "com.ulanzi.deck.system", Version: "1.0" },
+    State: 0,
+    ViewParam: viewNoTitle(existsSync(prevIcon) ? prevIcon : "", ""),
+  };
+  keypad.Actions["1_3"] = {
+    Action: "com.ulanzi.ulanzideck.system.open",
+    ActionID: randomUUID(),
+    ActionParam: { Path: nextApp },
+    LinkedTitle: false,
+    Name: "Next Profile",
+    Plugin: { Name: "システム", UUID: "com.ulanzi.deck.system", Version: "1.0" },
+    State: 0,
+    ViewParam: viewNoTitle(existsSync(nextIcon) ? nextIcon : "", ""),
+  };
 
   if (encoder) {
     encoder.Actions = encoder.Actions || {};
@@ -240,7 +254,7 @@ function wireNavOnPage(page) {
       Plugin: {
         Name: "Vibe Deck Status",
         UUID: "com.vibe.deck.status",
-        Version: "1.1.0",
+        Version: "1.1.1",
       },
       State: 0,
       ViewParam: viewNoTitle(),
@@ -381,6 +395,25 @@ function stripTitles(page) {
 }
 
 function main() {
+  // Ensure profile-switch helper apps exist (system.open can launch .app)
+  const prevApp = join(ROOT, "scripts/VibeProfilePrev.app");
+  const nextApp = join(ROOT, "scripts/VibeProfileNext.app");
+  const py = join(ROOT, "scripts/switch-profile.py");
+  for (const [app, dir] of [
+    [prevApp, "prev"],
+    [nextApp, "next"],
+  ]) {
+    try {
+      spawnSync(
+        "osacompile",
+        ["-o", app, "-e", `do shell script "/usr/bin/python3 '${py}' ${dir}"`],
+        { stdio: "ignore" },
+      );
+    } catch {
+      // ignore
+    }
+  }
+
   mkdirSync(dirname(PLUGIN_DST), { recursive: true });
   cpSync(PLUGIN_SRC, PLUGIN_DST, { recursive: true });
   console.log("plugin ->", PLUGIN_DST);
