@@ -1,0 +1,55 @@
+import {
+  type AgentSnapshot,
+  type AgentState,
+  type RawAgent,
+  STATE_PRIORITY,
+} from "../types.js";
+
+export const MAX_SLOTS = 8;
+
+export function assignSlots(
+  agents: RawAgent[],
+  maxSlots: number = MAX_SLOTS,
+): AgentSnapshot[] {
+  const sorted = [...agents].sort((a, b) => {
+    const byState = STATE_PRIORITY[a.state] - STATE_PRIORITY[b.state];
+    if (byState !== 0) return byState;
+    return b.updatedAt - a.updatedAt;
+  });
+
+  const picked = sorted.slice(0, maxSlots);
+  const now = Date.now();
+  const out: AgentSnapshot[] = [];
+
+  for (let i = 0; i < maxSlots; i += 1) {
+    const agent = picked[i];
+    if (!agent) {
+      out.push({
+        slot: i + 1,
+        id: `empty-${i + 1}`,
+        title: `Slot ${i + 1}`,
+        state: "empty",
+        updatedAt: now,
+      });
+      continue;
+    }
+    out.push({
+      slot: i + 1,
+      id: agent.id,
+      title: agent.title,
+      state: agent.state,
+      updatedAt: agent.updatedAt,
+      focusAction: agent.focusAction,
+    });
+  }
+
+  return out;
+}
+
+export function emptyBoard(maxSlots: number = MAX_SLOTS): AgentSnapshot[] {
+  return assignSlots([], maxSlots);
+}
+
+export function isActiveState(state: AgentState): boolean {
+  return state !== "empty" && state !== "idle";
+}

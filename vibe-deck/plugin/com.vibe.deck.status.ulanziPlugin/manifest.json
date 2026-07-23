@@ -1,0 +1,46 @@
+{
+  "Author": "Vibe Deck",
+  "Name": "Vibe Deck Status",
+  "Description": "Codex Micro–style live agent status colors for Claude, Codex, and Cursor on D200X.",
+  "Category": "Vibe Deck",
+  "CategoryIcon": "Images/category.png",
+  "Version": "1.0.0",
+  "UUID": "com.vibe.deck.status",
+  "CodePath": "app/plugin.js",
+  "Icon": "Images/plugin.png",
+  "Type": "JavaScript",
+  "OS": [
+    { "Platform": "mac", "MinimumVersion": "12.0" }
+  ],
+  "Software": { "MinVersion": "3.0.0" },
+  "Actions": [
+    {
+      "Icon": "Images/agent-idle.png",
+      "Name": "Agent Slot",
+      "Tooltip": "Live agent status tile (colors update from Vibe Deck Bridge)",
+      "UUID": "com.vibe.deck.status.agent",
+      "States": [
+        { "Image": "Images/agent-idle.png", "Name": "Idle" },
+        { "Image": "Images/agent-thinking.png", "Name": "Thinking" },
+        { "Image": "Images/agent-done.png", "Name": "Done" },
+        { "Image": "Images/agent-needs_input.png", "Name": "Needs Input" },
+        { "Image": "Images/agent-error.png", "Name": "Error" },
+        { "Image": "Images/agent-empty.png", "Name": "Empty" }
+      ]
+    },
+    {
+      "Icon": "Images/agent-thinking.png",
+      "Name": "Focus Agent",
+      "Tooltip": "Activate the desktop app for this agent slot",
+      "UUID": "com.vibe.deck.status.focus",
+      "States": [{ "Image": "Images/agent-thinking.png", "Name": "Focus" }]
+    },
+    {
+      "Icon": "Images/agent-done.png",
+      "Name": "Refresh Status",
+      "Tooltip": "Force a bridge status refresh",
+      "UUID": "com.vibe.deck.status.refresh",
+      "States": [{ "Image": "Images/agent-done.png", "Name": "Refresh" }]
+    }
+  ]
+}
