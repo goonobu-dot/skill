@@ -41,29 +41,29 @@ TOOL_THEMES = {
 }
 
 COMMANDS = [
-    ("accept", "承認", "check"),
-    ("reject", "拒否", "x"),
-    ("new", "新規", "plus"),
-    ("stop", "停止", "stop"),
-    ("model", "モデル", "sliders"),
-    ("dictation", "音声", "mic"),
-    ("terminal", "端末", "term"),
-    ("diff", "差分", "diff"),
-    ("composer", "編成", "compose"),
+    ("accept", "Accept", "check"),
+    ("reject", "Reject", "x"),
+    ("new", "New", "plus"),
+    ("stop", "Stop", "stop"),
+    ("model", "Model", "sliders"),
+    ("dictation", "Voice", "mic"),
+    ("terminal", "Term", "term"),
+    ("diff", "Diff", "diff"),
+    ("composer", "Compose", "compose"),
     ("agent", "Agent", "bot"),
-    ("design", "設計", "pen"),
-    ("implement", "実装", "code"),
-    ("review", "レビュー", "eye"),
-    ("fix", "修正", "wrench"),
-    ("test", "テスト", "flask"),
-    ("explain", "説明", "book"),
+    ("design", "Design", "pen"),
+    ("implement", "Build", "code"),
+    ("review", "Review", "eye"),
+    ("fix", "Fix", "wrench"),
+    ("test", "Test", "flask"),
+    ("explain", "Explain", "book"),
     ("commit", "Commit", "git"),
-    ("summary", "要約", "list"),
-    ("refresh", "更新", "refresh"),
-    ("settings", "設定", "gear"),
-    ("close", "閉じる", "x"),
+    ("summary", "Summary", "list"),
+    ("refresh", "Refresh", "refresh"),
+    ("settings", "Settings", "gear"),
+    ("close", "Close", "x"),
     ("help", "Help", "ask"),
-    ("profile", "PF", "layers"),
+    ("profile", "Profile", "layers"),
 ]
 
 
@@ -206,9 +206,8 @@ def render_command(tool: str, key: str, label: str, glyph: str) -> Image.Image:
     font = load_font(18)
     bbox = draw.textbbox((0, 0), label, font=font)
     tw = bbox[2] - bbox[0]
-    draw.text(((SIZE - tw) / 2 + 1, SIZE - 30), label, font=font, fill=(0, 0, 0, 80))
     draw.text(((SIZE - tw) / 2, SIZE - 31), label, font=font, fill=t["fg"])
-    return img.filter(ImageFilter.SMOOTH)
+    return img
 
 
 def render_profile_badge(tool: str, title: str) -> Image.Image:

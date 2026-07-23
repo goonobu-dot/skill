@@ -22,42 +22,43 @@ THEMES = {
         "bg": (245, 246, 248),
         "fg": (55, 60, 70),
         "soft": (210, 214, 220),
-        "label": "待機中",
+        "label": "Idle",
         "kind": "idle",
     },
     "thinking": {
         "bg": (37, 99, 235),
         "fg": (255, 255, 255),
         "soft": (147, 197, 253),
-        "label": "考え中",
+        "label": "Thinking",
         "kind": "think",
     },
     "done": {
         "bg": (22, 163, 74),
         "fg": (255, 255, 255),
         "soft": (134, 239, 172),
-        "label": "完了",
+        "label": "Done",
         "kind": "check",
     },
     "needs_input": {
         "bg": (245, 158, 11),
         "fg": (255, 255, 255),
         "soft": (253, 230, 138),
-        "label": "要確認",
+        "label": "Input",
         "kind": "ask",
     },
     "error": {
         "bg": (239, 68, 68),
         "fg": (255, 255, 255),
         "soft": (254, 202, 202),
-        "label": "エラー",
+        "label": "Error",
         "kind": "error",
     },
     "empty": {
+        # Unused lane — shown as Ready (not "Empty") so slots stay useful.
         "bg": (58, 58, 62),
         "fg": (190, 190, 196),
         "soft": (90, 90, 96),
-        "label": "空き",
+        "label": "Ready",
         "kind": "empty",
     },
 }
@@ -135,16 +136,14 @@ def render(theme: dict) -> Image.Image:
     th = bbox[3] - bbox[1]
     x = (SIZE - tw) / 2
     y = SIZE - 28 - th / 2
-    # slight shadow for readability
-    draw.text((x + 1, y + 1), label, font=font, fill=(0, 0, 0, 60))
+    # Single English label only (no shadow / no JP) — Studio title is cleared separately.
     draw.text((x, y), label, font=font, fill=theme["fg"])
 
     # subtle outer edge
     edge = Image.new("RGBA", (SIZE, SIZE), (0, 0, 0, 0))
     ed = ImageDraw.Draw(edge)
     ed.rounded_rectangle((1, 1, SIZE - 2, SIZE - 2), radius=25, outline=(255, 255, 255, 35), width=2)
-    img = Image.alpha_composite(img, edge)
-    return img.filter(ImageFilter.SMOOTH)
+    return Image.alpha_composite(img, edge)
 
 
 def render_nav(kind: str, bg: tuple[int, int, int], fg: tuple[int, int, int]) -> Image.Image:
@@ -155,7 +154,12 @@ def render_nav(kind: str, bg: tuple[int, int, int], fg: tuple[int, int, int]) ->
         draw.polygon([(cx + 18, cy - 28), (cx - 22, cy), (cx + 18, cy + 28)], fill=fg)
     else:
         draw.polygon([(cx - 18, cy - 28), (cx + 22, cy), (cx - 18, cy + 28)], fill=fg)
-    label = {"nav-prev": "前PF", "nav-next": "次PF", "page-prev": "前頁", "page-next": "次頁"}[kind]
+    label = {
+        "nav-prev": "Prev",
+        "nav-next": "Next",
+        "page-prev": "Pg-",
+        "page-next": "Pg+",
+    }[kind]
     font = load_font(20)
     bbox = draw.textbbox((0, 0), label, font=font)
     tw = bbox[2] - bbox[0]

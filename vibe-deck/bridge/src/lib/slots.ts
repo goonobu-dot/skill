@@ -25,15 +25,19 @@ export function assignSlots(
   const now = Date.now();
   const out: AgentSnapshot[] = [];
 
+  // Prefer keeping lanes useful: unused slots become Ready (idle) mirrors of
+  // the most recent agent / app focus, instead of dim "empty" tiles.
+  const seed = picked[0];
   for (let i = 0; i < maxSlots; i += 1) {
     const agent = picked[i];
     if (!agent) {
       out.push({
         slot: i + 1,
-        id: `empty-${i + 1}`,
-        title: `Slot ${i + 1}`,
-        state: "empty",
+        id: `ready-${i + 1}`,
+        title: seed?.title ? `Ready · ${seed.title}` : `Ready ${i + 1}`,
+        state: "idle",
         updatedAt: now,
+        focusAction: seed?.focusAction,
       });
       continue;
     }
