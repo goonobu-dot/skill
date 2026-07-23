@@ -1,10 +1,10 @@
 {
   "Author": "Vibe Deck",
   "Name": "Vibe Deck Status",
-  "Description": "Codex Micro–style live agent status colors for Claude, Codex, and Cursor on D200X.",
+  "Description": "Codex Micro–style live agent status, profile ring, and page nav for D200X.",
   "Category": "Vibe Deck",
   "CategoryIcon": "Images/category.png",
-  "Version": "1.0.0",
+  "Version": "1.1.0",
   "UUID": "com.vibe.deck.status",
   "CodePath": "app/plugin.js",
   "Icon": "Images/plugin.png",
@@ -41,6 +41,42 @@
       "Tooltip": "Force a bridge status refresh",
       "UUID": "com.vibe.deck.status.refresh",
       "States": [{ "Image": "Images/agent-done.png", "Name": "Refresh" }]
+    },
+    {
+      "Icon": "Images/nav-prev.png",
+      "Name": "Prev Profile",
+      "Tooltip": "Switch to previous Ulanzi profile (dynamic ring)",
+      "UUID": "com.vibe.deck.status.profile.prev",
+      "States": [{ "Image": "Images/nav-prev.png", "Name": "Prev" }]
+    },
+    {
+      "Icon": "Images/nav-next.png",
+      "Name": "Next Profile",
+      "Tooltip": "Switch to next Ulanzi profile (dynamic ring)",
+      "UUID": "com.vibe.deck.status.profile.next",
+      "States": [{ "Image": "Images/nav-next.png", "Name": "Next" }]
+    },
+    {
+      "Icon": "Images/page-prev.png",
+      "Name": "Prev Page",
+      "Tooltip": "Previous page within current profile",
+      "UUID": "com.vibe.deck.status.page.prev",
+      "States": [{ "Image": "Images/page-prev.png", "Name": "Prev Page" }]
+    },
+    {
+      "Icon": "Images/page-next.png",
+      "Name": "Next Page",
+      "Tooltip": "Next page within current profile",
+      "UUID": "com.vibe.deck.status.page.next",
+      "States": [{ "Image": "Images/page-next.png", "Name": "Next Page" }]
+    },
+    {
+      "Icon": "Images/page-next.png",
+      "Name": "Page Dial",
+      "Tooltip": "Rotate to change pages within the current profile",
+      "UUID": "com.vibe.deck.status.page.dial",
+      "States": [{ "Image": "Images/page-next.png", "Name": "Pages" }],
+      "Controllers": ["Encoder", "Keypad"]
     }
   ]
 }

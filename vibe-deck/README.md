@@ -2,7 +2,7 @@
 
 Codex Micro–inspired live agent status + control surface for Ulanzi D200X.
 
-Supports **Claude**, **Codex (ChatGPT)**, and **Cursor** desktop apps on macOS.
+Supports **Claude Code**, **Codex (ChatGPT)**, and **Cursor** on macOS, with distinct visual themes per tool.
 
 ## Quick start
 
@@ -10,7 +10,14 @@ Supports **Claude**, **Codex (ChatGPT)**, and **Cursor** desktop apps on macOS.
 ./scripts/install.sh
 ```
 
-Then restart Ulanzi Studio and open `Vibe · Codex` (or Claude / Cursor).
+Then restart Ulanzi Studio.
+
+## Hardware nav
+
+| Control | Action |
+|---------|--------|
+| Bottom left / right buttons | Cycle all Studio profiles (dynamic N) |
+| Rightmost dial | Pages 1 ↔ 2 ↔ 3 within current profile |
 
 ## Demo colors
 
@@ -18,8 +25,15 @@ Then restart Ulanzi Studio and open `Vibe · Codex` (or Claude / Cursor).
 VIBE_DECK_DEMO=1 node bridge/dist/index.js
 ```
 
+## Rewire after profile changes
+
+```bash
+python3 scripts/generate-icons.py
+python3 scripts/generate-tool-themes.py
+node scripts/wire-deck.mjs
+```
+
 ## Docs
 
 - [取扱説明書](docs/取扱説明書.md)
 - [クイックリファレンス](docs/クイックリファレンス.md)
-- Design spec: `../docs/superpowers/specs/2026-07-23-vibe-deck-d200x-design.md`

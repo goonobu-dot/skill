@@ -3,11 +3,13 @@ import { collectTool } from "../adapters/index.js";
 import type { StatusPayload, ToolId } from "../types.js";
 import { demoAgents } from "./demo.js";
 import { assignSlots } from "./slots.js";
+import { getCachedStatus, invalidateStatus, setCachedStatus } from "./cache.js";
 
 const TOOLS = new Set<ToolId>(["claude", "codex", "cursor"]);
+const STATUS_TTL_MS = 300;
 
 function sendJson(res: ServerResponse, code: number, body: unknown): void {
-  const data = JSON.stringify(body, null, 2);
+  const data = JSON.stringify(body);
   res.writeHead(code, {
     "Content-Type": "application/json; charset=utf-8",
     "Access-Control-Allow-Origin": "*",
@@ -23,15 +25,21 @@ function parseTool(url: URL): ToolId {
 
 export async function buildStatus(tool: ToolId): Promise<StatusPayload> {
   const demo = process.env.VIBE_DECK_DEMO === "1";
+  if (!demo) {
+    const cached = getCachedStatus(tool, STATUS_TTL_MS);
+    if (cached) return cached;
+  }
+
   const result = demo ? demoAgents(tool) : await collectTool(tool);
-  return {
+  const payload: StatusPayload = {
     tool,
     bridge: result.health,
-    // Demo keeps slot order so colors visibly cycle on each key.
     agents: assignSlots(result.agents, undefined, { prioritize: !demo }),
     updatedAt: Date.now(),
     note: result.note,
   };
+  if (!demo) setCachedStatus(tool, payload);
+  return payload;
 }
 
 export function startServer(port: number): ReturnType<typeof createServer> {
@@ -44,7 +52,14 @@ export function startServer(port: number): ReturnType<typeof createServer> {
       }
       if (req.method === "GET" && url.pathname === "/status") {
         const tool = parseTool(url);
+        if (url.searchParams.get("fresh") === "1") invalidateStatus(tool);
         sendJson(res, 200, await buildStatus(tool));
+        return;
+      }
+      if (req.method === "POST" && url.pathname === "/invalidate") {
+        const tool = parseTool(url);
+        invalidateStatus(tool);
+        sendJson(res, 200, { ok: true });
         return;
       }
       if (req.method === "GET" && url.pathname === "/") {

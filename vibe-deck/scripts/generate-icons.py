@@ -147,6 +147,22 @@ def render(theme: dict) -> Image.Image:
     return img.filter(ImageFilter.SMOOTH)
 
 
+def render_nav(kind: str, bg: tuple[int, int, int], fg: tuple[int, int, int]) -> Image.Image:
+    img = rounded_bg(bg)
+    draw = ImageDraw.Draw(img)
+    cx, cy = SIZE // 2, SIZE // 2 - 6
+    if kind in ("nav-prev", "page-prev"):
+        draw.polygon([(cx + 18, cy - 28), (cx - 22, cy), (cx + 18, cy + 28)], fill=fg)
+    else:
+        draw.polygon([(cx - 18, cy - 28), (cx + 22, cy), (cx - 18, cy + 28)], fill=fg)
+    label = {"nav-prev": "前PF", "nav-next": "次PF", "page-prev": "前頁", "page-next": "次頁"}[kind]
+    font = load_font(20)
+    bbox = draw.textbbox((0, 0), label, font=font)
+    tw = bbox[2] - bbox[0]
+    draw.text(((SIZE - tw) / 2, SIZE - 34), label, font=font, fill=fg)
+    return img
+
+
 def main() -> None:
     for d in OUTS:
         d.mkdir(parents=True, exist_ok=True)
@@ -162,6 +178,19 @@ def main() -> None:
         if name == "done":
             for d in OUTS[1:]:
                 img.save(d / "category.png")
+
+    nav_specs = {
+        "nav-prev": ((30, 41, 59), (226, 232, 240)),
+        "nav-next": ((30, 41, 59), (226, 232, 240)),
+        "page-prev": ((15, 23, 42), (147, 197, 253)),
+        "page-next": ((15, 23, 42), (147, 197, 253)),
+    }
+    for name, (bg, fg) in nav_specs.items():
+        img = render_nav(name, bg, fg)
+        for d in OUTS:
+            path = d / f"{name}.png"
+            img.save(path, format="PNG")
+            print("wrote", path)
     print("done")
 
 
