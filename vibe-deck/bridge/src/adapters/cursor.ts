@@ -9,6 +9,7 @@ import type { AdapterResult, ToolAdapter } from "./types.js";
 
 const execFileAsync = promisify(execFile);
 const CURSOR_HOME = join(homedir(), ".cursor");
+const PROJECTS = join(CURSOR_HOME, "projects");
 
 async function cursorRunning(): Promise<boolean> {
   try {
@@ -21,46 +22,98 @@ async function cursorRunning(): Promise<boolean> {
   }
 }
 
-async function recentAgentHints(): Promise<RawAgent[]> {
-  const roots = [
-    join(CURSOR_HOME, "projects"),
-    join(CURSOR_HOME, "ai-tracking"),
-    join(CURSOR_HOME, "chats"),
-  ];
-  const files: string[] = [];
-  for (const root of roots) {
-    if (!existsSync(root)) continue;
+async function listTranscripts(): Promise<string[]> {
+  if (!existsSync(PROJECTS)) return [];
+  const out: string[] = [];
+  let projects: string[] = [];
+  try {
+    projects = (await readdir(PROJECTS)).slice(0, 80);
+  } catch {
+    return [];
+  }
+  for (const proj of projects) {
+    const dir = join(PROJECTS, proj, "agent-transcripts");
+    if (!existsSync(dir)) continue;
     try {
-      const entries = await readdir(root, { withFileTypes: true });
-      for (const e of entries.slice(0, 20)) {
-        const full = join(root, e.name);
-        if (e.isFile() && /\.(json|jsonl|log|txt)$/i.test(e.name)) {
-          files.push(full);
+      const walk = async (d: string, depth = 0): Promise<void> => {
+        if (depth > 3) return;
+        const entries = await readdir(d, { withFileTypes: true });
+        for (const e of entries) {
+          const full = join(d, e.name);
+          if (e.isDirectory()) await walk(full, depth + 1);
+          else if (e.name.endsWith(".jsonl")) out.push(full);
         }
-      }
+      };
+      await walk(dir);
     } catch {
       // ignore
     }
   }
+  return out;
+}
 
-  const agents: RawAgent[] = [];
-  for (const file of files.slice(0, 10)) {
+function inferState(lines: string[], ageSec: number): RawAgent["state"] {
+  const last = (lines[lines.length - 1] || "").toLowerCase();
+  const prev = (lines[lines.length - 2] || "").toLowerCase();
+
+  if (/turn_ended/.test(last) && /error|fail/.test(last)) return "error";
+  if (/needs.?input|awaiting|approval|waiting_for_user|interrupted/.test(last)) {
+    return "needs_input";
+  }
+
+  // Open user turn (no turn_ended after it) => agent is working.
+  // Transcripts often don't flush assistant chunks until later, so don't rely on mtime alone.
+  if (/role":"user"|user_query/.test(last)) {
+    return ageSec <= 60 * 30 ? "thinking" : "idle";
+  }
+
+  // Assistant chunks currently streaming / just written
+  if (/role":"assistant"|tool_call|function_call/.test(last) && ageSec <= 15) {
+    return "thinking";
+  }
+
+  if (/turn_ended/.test(last)) {
+    if (ageSec <= 90) return "done";
+    return "idle";
+  }
+
+  // Assistant finished recently but turn_ended not yet written
+  if (/role":"assistant"/.test(last) && ageSec <= 90) return "done";
+  if (/role":"assistant"/.test(prev) && /turn_ended/.test(last) && ageSec <= 90) {
+    return "done";
+  }
+
+  return "idle";
+}
+
+async function agentsFromTranscripts(): Promise<RawAgent[]> {
+  const files = await listTranscripts();
+  const ranked: { file: string; mtime: number }[] = [];
+  for (const file of files) {
     try {
       const st = await stat(file);
+      // ignore stale (> 6h)
       if (Date.now() - st.mtimeMs > 1000 * 60 * 60 * 6) continue;
-      const text = (await readFile(file, "utf8")).slice(-4000);
-      let state: RawAgent["state"] = "idle";
-      if (/error|failed/i.test(text)) state = "error";
-      else if (/awaiting|approval|needs.?input/i.test(text)) {
-        state = "needs_input";
-      } else if (/streaming|tool_call|generating|thinking/i.test(text)) {
-        state = "thinking";
-      } else if (/completed|done/i.test(text)) state = "done";
+      ranked.push({ file, mtime: st.mtimeMs });
+    } catch {
+      // ignore
+    }
+  }
+  ranked.sort((a, b) => b.mtime - a.mtime);
+
+  const agents: RawAgent[] = [];
+  for (const item of ranked.slice(0, 8)) {
+    try {
+      const text = await readFile(item.file, "utf8");
+      const lines = text.trim().split(/\n+/);
+      const ageSec = (Date.now() - item.mtime) / 1000;
+      const state = inferState(lines, ageSec);
+      const base = item.file.split("/").slice(-2).join("/");
       agents.push({
-        id: file,
-        title: file.split("/").pop()!.slice(0, 40),
+        id: item.file,
+        title: base.slice(0, 36),
         state,
-        updatedAt: st.mtimeMs,
+        updatedAt: item.mtime,
         focusAction: { kind: "activate_app", payload: "Cursor" },
       });
     } catch {
@@ -74,14 +127,17 @@ export const cursorAdapter: ToolAdapter = {
   tool: "cursor",
   async collect(): Promise<AdapterResult> {
     const running = await cursorRunning();
-    const hinted = await recentAgentHints();
+    const fromTranscripts = await agentsFromTranscripts();
 
-    if (hinted.length) {
+    if (fromTranscripts.length) {
+      const active = fromTranscripts.some((a) => a.state !== "idle");
       return {
         tool: "cursor",
-        agents: hinted.slice(0, 8),
-        health: "degraded",
-        note: "Cursor status is best-effort (no public local agent API)",
+        agents: fromTranscripts,
+        health: active ? "ok" : "degraded",
+        note: active
+          ? "Cursor agent activity from local transcripts"
+          : "Cursor transcripts found; no active turn detected",
       };
     }
 
@@ -98,7 +154,7 @@ export const cursorAdapter: ToolAdapter = {
           },
         ],
         health: "degraded",
-        note: "Cursor running; per-agent colors unavailable",
+        note: "Cursor running; no recent agent transcripts",
       };
     }
 
