@@ -27,7 +27,8 @@ export async function buildStatus(tool: ToolId): Promise<StatusPayload> {
   return {
     tool,
     bridge: result.health,
-    agents: assignSlots(result.agents),
+    // Demo keeps slot order so colors visibly cycle on each key.
+    agents: assignSlots(result.agents, undefined, { prioritize: !demo }),
     updatedAt: Date.now(),
     note: result.note,
   };

@@ -10,12 +10,16 @@ export const MAX_SLOTS = 8;
 export function assignSlots(
   agents: RawAgent[],
   maxSlots: number = MAX_SLOTS,
+  opts: { prioritize?: boolean } = {},
 ): AgentSnapshot[] {
-  const sorted = [...agents].sort((a, b) => {
-    const byState = STATE_PRIORITY[a.state] - STATE_PRIORITY[b.state];
-    if (byState !== 0) return byState;
-    return b.updatedAt - a.updatedAt;
-  });
+  const prioritize = opts.prioritize !== false;
+  const sorted = prioritize
+    ? [...agents].sort((a, b) => {
+        const byState = STATE_PRIORITY[a.state] - STATE_PRIORITY[b.state];
+        if (byState !== 0) return byState;
+        return b.updatedAt - a.updatedAt;
+      })
+    : [...agents];
 
   const picked = sorted.slice(0, maxSlots);
   const now = Date.now();
